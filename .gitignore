@@ -1,0 +1,32 @@
+# Build output
+**/bin/
+**/obj/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Test output
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Logs
+*.log
+
+# Local / temp / backup
+*.bak
+*.tmp
+*.temp
+*.deb
+.DS_Store
+
+# Secrets / local config
+.env
+.env.*
+**/appsettings.Development.json
+**/secrets.json

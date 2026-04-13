@@ -1,0 +1,6 @@
+@BusinessJournal.Api_HostAddress = http://localhost:5159
+
+GET {{BusinessJournal.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+  <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <NoWarn>$(NoWarn);1591</NoWarn>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>17e6e401-e8ed-4d5d-b72e-cd2fb6a8157a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BusinessJournal.Application\BusinessJournal.Application.csproj" />
+    <ProjectReference Include="..\BusinessJournal.Infrastructure\BusinessJournal.Infrastructure.csproj" />
+    <ProjectReference Include="..\BusinessJournal.Domain\BusinessJournal.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
