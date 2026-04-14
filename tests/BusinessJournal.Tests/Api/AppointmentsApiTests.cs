@@ -89,6 +89,61 @@ public sealed class AppointmentsApiTests : IClassFixture<ApiWebApplicationFactor
         Assert.NotNull(response.Headers.Location);
         Assert.Contains($"/api/Appointments/{appointment.Id}", response.Headers.Location!.ToString());
     }
+    [Fact]
+public async Task CreateAppointment_WithMissingStartTime_ShouldReturnBadRequest()
+{
+    using var client = await CreateAuthenticatedClientAsync();
+
+    var customer = await CreateCustomerAsync(
+        client,
+        "Dana Levi",
+        "0507777777",
+        "Dana@Gmail.com");
+
+    var request = new ScheduleAppointmentRequest
+    {
+        CustomerId = customer.Id,
+        Title = "Hair Color",
+        StartsAt = default,
+        EndsAt = new DateTime(2031, 1, 1, 12, 0, 0)
+    };
+
+    var response = await client.PostAsJsonAsync("/api/Appointments", request);
+
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+}
+[Fact]
+public async Task RescheduleAppointment_WithMissingEndTime_ShouldReturnBadRequest()
+{
+    using var client = await CreateAuthenticatedClientAsync();
+
+    var customer = await CreateCustomerAsync(
+        client,
+        "Noa Levi",
+        "0508888888",
+        "Noa@Gmail.com");
+
+    var (startsAt, endsAt) = CreateUniqueSlot();
+
+    var appointment = await CreateAppointmentAsync(
+        client,
+        customer.Id,
+        "Hair Cut",
+        startsAt,
+        endsAt);
+
+    var request = new RescheduleAppointmentRequest
+    {
+        StartsAt = new DateTime(2031, 1, 2, 15, 0, 0),
+        EndsAt = default
+    };
+
+    var response = await client.PutAsJsonAsync(
+        $"/api/Appointments/{appointment.Id}/reschedule",
+        request);
+
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+}
 
     [Fact]
     public async Task CancelAppointment_WhenAppointmentExists_ShouldReturnNoContentAndPersistCancellation()

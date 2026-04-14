@@ -28,39 +28,11 @@ public sealed class SqlAppointmentRepository : IAppointmentRepository
             VALUES (@Id, @CustomerId, @Title, @StartsAt, @EndsAt, @Notes, @IsCancelled);
             """;
 
-        command.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier)
-        {
-            Value = appointment.Id
-        });
+        AddCommonParameters(command, appointment);
 
         command.Parameters.Add(new SqlParameter("@CustomerId", SqlDbType.UniqueIdentifier)
         {
             Value = appointment.CustomerId
-        });
-
-        command.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 200)
-        {
-            Value = appointment.Title
-        });
-
-        command.Parameters.Add(new SqlParameter("@StartsAt", SqlDbType.DateTime2)
-        {
-            Value = appointment.StartsAt
-        });
-
-        command.Parameters.Add(new SqlParameter("@EndsAt", SqlDbType.DateTime2)
-        {
-            Value = appointment.EndsAt
-        });
-
-        command.Parameters.Add(new SqlParameter("@Notes", SqlDbType.NVarChar, 1000)
-        {
-            Value = appointment.Notes is null ? DBNull.Value : appointment.Notes
-        });
-
-        command.Parameters.Add(new SqlParameter("@IsCancelled", SqlDbType.Bit)
-        {
-            Value = appointment.IsCancelled
         });
 
         command.ExecuteNonQuery();
@@ -83,35 +55,7 @@ public sealed class SqlAppointmentRepository : IAppointmentRepository
             WHERE Id = @Id;
             """;
 
-        command.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier)
-        {
-            Value = appointment.Id
-        });
-
-        command.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 200)
-        {
-            Value = appointment.Title
-        });
-
-        command.Parameters.Add(new SqlParameter("@StartsAt", SqlDbType.DateTime2)
-        {
-            Value = appointment.StartsAt
-        });
-
-        command.Parameters.Add(new SqlParameter("@EndsAt", SqlDbType.DateTime2)
-        {
-            Value = appointment.EndsAt
-        });
-
-        command.Parameters.Add(new SqlParameter("@Notes", SqlDbType.NVarChar, 1000)
-        {
-            Value = appointment.Notes is null ? DBNull.Value : appointment.Notes
-        });
-
-        command.Parameters.Add(new SqlParameter("@IsCancelled", SqlDbType.Bit)
-        {
-            Value = appointment.IsCancelled
-        });
+        AddCommonParameters(command, appointment);
 
         command.ExecuteNonQuery();
     }
@@ -204,6 +148,42 @@ public sealed class SqlAppointmentRepository : IAppointmentRepository
         }
 
         return appointments;
+    }
+
+    private static void AddCommonParameters(SqlCommand command, Appointment appointment)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(appointment);
+
+        command.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier)
+        {
+            Value = appointment.Id
+        });
+
+        command.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 200)
+        {
+            Value = appointment.Title
+        });
+
+        command.Parameters.Add(new SqlParameter("@StartsAt", SqlDbType.DateTime2)
+        {
+            Value = appointment.StartsAt
+        });
+
+        command.Parameters.Add(new SqlParameter("@EndsAt", SqlDbType.DateTime2)
+        {
+            Value = appointment.EndsAt
+        });
+
+        command.Parameters.Add(new SqlParameter("@Notes", SqlDbType.NVarChar, 1000)
+        {
+            Value = appointment.Notes is null ? DBNull.Value : appointment.Notes
+        });
+
+        command.Parameters.Add(new SqlParameter("@IsCancelled", SqlDbType.Bit)
+        {
+            Value = appointment.IsCancelled
+        });
     }
 
     private static Appointment MapAppointment(SqlDataReader reader)

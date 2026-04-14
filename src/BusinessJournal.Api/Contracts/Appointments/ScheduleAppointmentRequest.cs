@@ -15,7 +15,6 @@ public sealed class ScheduleAppointmentRequest : IValidatableObject
 
     public DateTime EndsAt { get; init; }
 
-    [StringLength(1000)]
     public string? Notes { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -27,25 +26,13 @@ public sealed class ScheduleAppointmentRequest : IValidatableObject
                 new[] { nameof(CustomerId) });
         }
 
-        if (StartsAt == default)
+        foreach (var validationResult in AppointmentTimeValidation.Validate(
+                     StartsAt,
+                     EndsAt,
+                     nameof(StartsAt),
+                     nameof(EndsAt)))
         {
-            yield return new ValidationResult(
-                "Start time is required.",
-                new[] { nameof(StartsAt) });
-        }
-
-        if (EndsAt == default)
-        {
-            yield return new ValidationResult(
-                "End time is required.",
-                new[] { nameof(EndsAt) });
-        }
-
-        if (StartsAt != default && EndsAt != default && EndsAt <= StartsAt)
-        {
-            yield return new ValidationResult(
-                "End time must be later than start time.",
-                new[] { nameof(StartsAt), nameof(EndsAt) });
+            yield return validationResult;
         }
     }
 }

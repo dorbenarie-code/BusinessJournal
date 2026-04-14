@@ -23,7 +23,7 @@ public sealed class AppUser
         }
 
         Id = id;
-        Email = TextNormalizer.NormalizeRequiredEmail(email);
+        Email = TextNormalizer.NormalizeRequiredEmail(email, nameof(email), "Email is required.");
         PasswordHash = TextNormalizer.NormalizeRequired(passwordHash, nameof(passwordHash), "Password hash is required.");
         Role = TextNormalizer.NormalizeRequired(role, nameof(role), "Role is required.");
         IsActive = isActive;
