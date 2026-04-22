@@ -1,0 +1,207 @@
+@using BusinessJournal.Web.Features.Appointments
+
+@if (!string.IsNullOrWhiteSpace(AppointmentsError))
+{
+    <div class="alert alert-danger py-2 px-3 mb-3" role="alert">
+        @AppointmentsError
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(AppointmentsSuccessMessage))
+{
+    <div class="alert alert-success py-2 px-3 mb-3" role="alert">
+        @AppointmentsSuccessMessage
+    </div>
+}
+
+@if (SelectedCustomerId == Guid.Empty)
+{
+    <div class="alert alert-info py-2 px-3 mb-0" role="alert">
+        Select a customer to view appointments.
+    </div>
+}
+else if (IsLoadingAppointments)
+{
+    <div class="alert alert-info py-2 px-3 mb-0" role="alert">
+        Loading appointments...
+    </div>
+}
+else if (Appointments.Count == 0)
+{
+    <div class="alert alert-light py-2 px-3 mb-0" role="alert">
+        No appointments found for the selected customer.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Title</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var appointment in Appointments)
+                {
+                    var isEditing = EditingAppointmentId == appointment.Id;
+                    var isHighlighted = HighlightedAppointmentId == appointment.Id;
+
+                    <tr class="@(isHighlighted ? "table-warning" : null)">
+                        <td class="fw-semibold">@appointment.Title</td>
+                        <td>@FormatDateTime(appointment.StartsAt)</td>
+                        <td>@FormatDateTime(appointment.EndsAt)</td>
+                        <td>
+                            @if (appointment.IsCancelled)
+                            {
+                                <span class="badge bg-secondary">Cancelled</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                        </td>
+                        <td>@appointment.Notes</td>
+                        <td class="text-end">
+                            @if (!appointment.IsCancelled)
+                            {
+                                <div class="d-inline-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => OnCancelAppointment.InvokeAsync(appointment.Id)"
+                                            disabled="@IsCancelling">
+                                        Cancel
+                                    </button>
+
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            @onclick="() => OnBeginReschedule.InvokeAsync(appointment.Id)"
+                                            disabled="@IsRescheduling">
+                                        Reschedule
+                                    </button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+
+                    @if (isEditing)
+                    {
+                        <tr>
+                            <td colspan="6" class="bg-light">
+                                <div class="p-3">
+                                    <EditForm Model="RescheduleModel" OnValidSubmit="OnSaveReschedule">
+                                        <DataAnnotationsValidator />
+                                        <ValidationSummary />
+
+                                        @if (!string.IsNullOrWhiteSpace(RescheduleError))
+                                        {
+                                            <div class="alert alert-danger py-2 px-3 mb-3" role="alert">
+                                                @RescheduleError
+                                            </div>
+                                        }
+
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-12 col-md-4">
+                                                <label class="form-label fw-semibold">New start</label>
+                                                <input type="datetime-local"
+                                                       class="form-control"
+                                                       value="@RescheduleModel.StartsAt"
+                                                       @onchange="OnRescheduleStartsAtChanged" />
+                                            </div>
+
+                                            <div class="col-12 col-md-4">
+                                                <label class="form-label fw-semibold">New end</label>
+                                                <input type="datetime-local"
+                                                       class="form-control"
+                                                       value="@RescheduleModel.EndsAt"
+                                                       @onchange="OnRescheduleEndsAtChanged" />
+                                            </div>
+
+                                            <div class="col-12 col-md-4">
+                                                <div class="d-flex gap-2">
+                                                    <button type="submit"
+                                                            class="btn btn-primary"
+                                                            disabled="@IsRescheduling">
+                                                        @(IsRescheduling ? "Saving..." : "Save")
+                                                    </button>
+
+                                                    <button type="button"
+                                                            class="btn btn-outline-secondary"
+                                                            @onclick="OnCancelRescheduleEdit"
+                                                            disabled="@IsRescheduling">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </EditForm>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid SelectedCustomerId { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AppointmentResponseModel> Appointments { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public RescheduleAppointmentInputModel RescheduleModel { get; set; } = default!;
+
+    [Parameter]
+    public bool IsLoadingAppointments { get; set; }
+
+    [Parameter]
+    public bool IsCancelling { get; set; }
+
+    [Parameter]
+    public bool IsRescheduling { get; set; }
+
+    [Parameter]
+    public Guid? EditingAppointmentId { get; set; }
+
+    [Parameter]
+    public Guid? HighlightedAppointmentId { get; set; }
+
+    [Parameter]
+    public string? AppointmentsError { get; set; }
+
+    [Parameter]
+    public string? AppointmentsSuccessMessage { get; set; }
+
+    [Parameter]
+    public string? RescheduleError { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<Guid> OnCancelAppointment { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<Guid> OnBeginReschedule { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnSaveReschedule { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancelRescheduleEdit { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<ChangeEventArgs> OnRescheduleStartsAtChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<ChangeEventArgs> OnRescheduleEndsAtChanged { get; set; }
+
+    private static string FormatDateTime(DateTime value)
+    {
+        return value.ToString("dd/MM/yyyy HH:mm");
+    }
+}

@@ -1,7 +1,160 @@
 ﻿@page "/"
+@using BusinessJournal.Web.Features.Auth
+@inject AuthSession AuthSession
+@inject NavigationManager NavigationManager
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid py-4">
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="row g-4 align-items-center">
+                <div class="col-12 col-lg-8">
+                    <div class="mb-3">
+                        <span class="badge text-bg-primary">BusinessJournal</span>
+                    </div>
 
-Welcome to your new app.
+                    <h1 class="display-5 mb-3">Customer and appointment management</h1>
+
+                    <p class="lead text-muted mb-4">
+                        A clean workspace for managing customers, scheduling appointments,
+                        and handling day-to-day activity in one place.
+                    </p>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-primary"
+                                type="button"
+                                @onclick='() => NavigationManager.NavigateTo("/customers")'>
+                            Open customers
+                        </button>
+
+                        <button class="btn btn-outline-primary"
+                                type="button"
+                                @onclick='() => NavigationManager.NavigateTo("/appointments")'>
+                            Open appointments
+                        </button>
+
+                        @if (!AuthSession.IsAuthenticated)
+                        {
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    @onclick='() => NavigationManager.NavigateTo("/login")'>
+                                Sign in
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="border rounded-4 bg-light p-4 h-100">
+                        <div class="fw-semibold mb-2">Current status</div>
+
+                        @if (AuthSession.IsAuthenticated)
+                        {
+                            <div class="alert alert-success mb-0" role="alert">
+                                You are signed in and ready to work.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-secondary mb-0" role="alert">
+                                You are not signed in yet. Login is required for protected actions.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3">Customers</h2>
+                    <p class="text-muted mb-4">
+                        Create customer records, browse the customer list, and search by name,
+                        phone number, or email.
+                    </p>
+
+                    <button class="btn btn-sm btn-outline-primary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/customers")'>
+                        Go to customers
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3">Appointments</h2>
+                    <p class="text-muted mb-4">
+                        Schedule appointments, review active and cancelled items,
+                        and manage rescheduling when needed.
+                    </p>
+
+                    <button class="btn btn-sm btn-outline-primary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/appointments")'>
+                        Go to appointments
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-12 col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3">Access</h2>
+                    <p class="text-muted mb-4">
+                        Use the login page to start a secure session and work with the protected
+                        parts of the system.
+                    </p>
+
+                    <button class="btn btn-sm btn-outline-primary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/login")'>
+                        Go to login
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <h2 class="h4 mb-3">What you can do here</h2>
+
+            <div class="row g-3">
+                <div class="col-12 col-lg-4">
+                    <div class="border rounded-3 p-3 bg-light h-100">
+                        <div class="fw-semibold mb-2">Manage customers</div>
+                        <div class="text-muted">
+                            Keep customer information organized and easy to access.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="border rounded-3 p-3 bg-light h-100">
+                        <div class="fw-semibold mb-2">Handle appointments</div>
+                        <div class="text-muted">
+                            Schedule, review, cancel, and reschedule appointments in a simple flow.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="border rounded-3 p-3 bg-light h-100">
+                        <div class="fw-semibold mb-2">Work from one place</div>
+                        <div class="text-muted">
+                            The current frontend gives you a focused workspace without unnecessary clutter.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

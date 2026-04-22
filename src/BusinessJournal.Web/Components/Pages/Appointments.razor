@@ -1,0 +1,484 @@
+@page "/appointments"
+
+@using System.Linq
+@using BusinessJournal.Web.Features.Appointments
+@using BusinessJournal.Web.Features.Customers
+@using Microsoft.JSInterop
+@inject AppointmentsApiClient AppointmentsApiClient
+@inject CustomersApiClient CustomersApiClient
+@inject BusinessJournal.Web.Features.Auth.AuthSession AuthSession
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Appointments</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h1 class="display-6 mb-2">Appointments</h1>
+        <p class="text-muted mb-0">Create, update, and manage customer appointments.</p>
+    </div>
+
+    @if (!AuthSession.IsAuthenticated)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <h2 class="h4 mb-1">Login required</h2>
+                    <p class="text-muted mb-0">
+                        You need to sign in before viewing or managing appointments.
+                    </p>
+                </div>
+
+                <div class="alert alert-secondary mb-4" role="alert">
+                    Your current session is not authenticated.
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/login")'>
+                        Go to login
+                    </button>
+
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/")'>
+                        Back to home
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else if (_isLoadingCustomers)
+    {
+        <div class="alert alert-info mb-0" role="alert">
+            Loading customers...
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 align-items-start">
+            <div class="col-12 col-xl-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-4">
+                        <AppointmentCreateForm
+                            Customers="@OrderedCustomers"
+                            Model="@_model"
+                            SelectedCustomerId="@_selectedCustomerId"
+                            IsSubmitting="@_isSubmitting"
+                            FormError="@_formError"
+                            FormSuccess="@_formSuccess"
+                            OnCustomerChanged="@OnCustomerChanged"
+                            OnStartsAtChanged="@OnStartsAtChanged"
+                            OnEndsAtChanged="@OnEndsAtChanged"
+                            OnSubmit="@HandleSubmitAsync" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-7">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+                            <div>
+                                <h2 class="h4 mb-1">Appointments list</h2>
+                                <p class="text-muted mb-0">View active and cancelled appointments for the selected customer.</p>
+                            </div>
+
+                            @if (_selectedCustomerId != Guid.Empty)
+                            {
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <div class="btn-group" role="group" aria-label="Appointment filters">
+                                        <button type="button"
+                                                class="@GetFilterButtonClass(AppointmentFilter.All)"
+                                                @onclick="() => SetFilter(AppointmentFilter.All)">
+                                            All
+                                        </button>
+
+                                        <button type="button"
+                                                class="@GetFilterButtonClass(AppointmentFilter.Active)"
+                                                @onclick="() => SetFilter(AppointmentFilter.Active)">
+                                            Active
+                                        </button>
+
+                                        <button type="button"
+                                                class="@GetFilterButtonClass(AppointmentFilter.Cancelled)"
+                                                @onclick="() => SetFilter(AppointmentFilter.Cancelled)">
+                                            Cancelled
+                                        </button>
+                                    </div>
+
+                                    <button class="btn btn-outline-secondary"
+                                            type="button"
+                                            disabled="@_isLoadingAppointments"
+                                            @onclick="RefreshAppointmentsAsync">
+                                        @(_isLoadingAppointments ? "Refreshing..." : "Refresh")
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        <AppointmentsTable
+                            SelectedCustomerId="@_selectedCustomerId"
+                            Appointments="@FilteredAppointments"
+                            RescheduleModel="@_rescheduleModel"
+                            IsLoadingAppointments="@_isLoadingAppointments"
+                            IsCancelling="@_isCancelling"
+                            IsRescheduling="@_isRescheduling"
+                            EditingAppointmentId="@_editingAppointmentId"
+                            HighlightedAppointmentId="@_highlightedAppointmentId"
+                            AppointmentsError="@_appointmentsError"
+                            AppointmentsSuccessMessage="@_appointmentsSuccessMessage"
+                            RescheduleError="@_rescheduleError"
+                            OnCancelAppointment="@ConfirmAndCancelAppointmentAsync"
+                            OnBeginReschedule="@BeginReschedule"
+                            OnSaveReschedule="@SaveRescheduleAsync"
+                            OnCancelRescheduleEdit="@CancelRescheduleEdit"
+                            OnRescheduleStartsAtChanged="@OnRescheduleStartsAtChanged"
+                            OnRescheduleEndsAtChanged="@OnRescheduleEndsAtChanged" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(4);
+
+    private readonly List<CustomerResponseModel> _customers = [];
+    private readonly List<AppointmentResponseModel> _appointments = [];
+
+    private CreateAppointmentInputModel _model = new();
+    private RescheduleAppointmentInputModel _rescheduleModel = new();
+
+    private Guid _selectedCustomerId;
+    private Guid? _editingAppointmentId;
+    private Guid? _highlightedAppointmentId;
+
+    private bool _isLoadingCustomers = true;
+    private bool _isLoadingAppointments;
+    private bool _isSubmitting;
+    private bool _isCancelling;
+    private bool _isRescheduling;
+
+    private string? _formError;
+    private string? _formSuccess;
+    private string? _appointmentsError;
+    private string? _appointmentsSuccessMessage;
+    private string? _rescheduleError;
+
+    private AppointmentFilter _selectedFilter = AppointmentFilter.All;
+
+    private IReadOnlyList<CustomerResponseModel> OrderedCustomers =>
+        _customers
+            .OrderBy(x => x.FullName)
+            .ToList();
+
+    private IReadOnlyList<AppointmentResponseModel> FilteredAppointments =>
+        _selectedFilter switch
+        {
+            AppointmentFilter.Active => _appointments.Where(x => !x.IsCancelled).ToList(),
+            AppointmentFilter.Cancelled => _appointments.Where(x => x.IsCancelled).ToList(),
+            _ => _appointments
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthSession.IsAuthenticated)
+        {
+            _isLoadingCustomers = false;
+            return;
+        }
+
+        await LoadCustomersAsync();
+    }
+
+    private async Task LoadCustomersAsync()
+    {
+        _isLoadingCustomers = true;
+        _appointmentsError = null;
+
+        try
+        {
+            var customers = await CustomersApiClient.GetAllAsync();
+
+            _customers.Clear();
+            _customers.AddRange(customers.OrderBy(x => x.FullName));
+        }
+        catch (Exception ex)
+        {
+            _appointmentsError = ex.Message;
+        }
+        finally
+        {
+            _isLoadingCustomers = false;
+        }
+    }
+
+    private async Task OnCustomerChanged(ChangeEventArgs args)
+    {
+        _formError = null;
+        _formSuccess = null;
+        _appointmentsError = null;
+        _appointmentsSuccessMessage = null;
+        _rescheduleError = null;
+
+        if (Guid.TryParse(args.Value?.ToString(), out var customerId))
+        {
+            _selectedCustomerId = customerId;
+            _model.CustomerId = customerId;
+            _editingAppointmentId = null;
+            _selectedFilter = AppointmentFilter.All;
+
+            await LoadAppointmentsAsync();
+        }
+        else
+        {
+            _selectedCustomerId = Guid.Empty;
+            _model.CustomerId = Guid.Empty;
+            _appointments.Clear();
+            _editingAppointmentId = null;
+            _highlightedAppointmentId = null;
+            _selectedFilter = AppointmentFilter.All;
+        }
+    }
+
+    private void SetFilter(AppointmentFilter filter)
+    {
+        _selectedFilter = filter;
+    }
+
+    private string GetFilterButtonClass(AppointmentFilter filter)
+    {
+        return _selectedFilter == filter
+            ? "btn btn-primary"
+            : "btn btn-outline-primary";
+    }
+
+    private void OnStartsAtChanged(ChangeEventArgs args)
+    {
+        _model.StartsAt = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnEndsAtChanged(ChangeEventArgs args)
+    {
+        _model.EndsAt = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnRescheduleStartsAtChanged(ChangeEventArgs args)
+    {
+        _rescheduleModel.StartsAt = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnRescheduleEndsAtChanged(ChangeEventArgs args)
+    {
+        _rescheduleModel.EndsAt = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task RefreshAppointmentsAsync()
+    {
+        await LoadAppointmentsAsync();
+    }
+
+    private async Task LoadAppointmentsAsync()
+    {
+        if (_selectedCustomerId == Guid.Empty)
+        {
+            _appointments.Clear();
+            return;
+        }
+
+        _isLoadingAppointments = true;
+        _appointmentsError = null;
+
+        try
+        {
+            var appointments = await AppointmentsApiClient.GetByCustomerIdAsync(_selectedCustomerId);
+
+            var sortedAppointments = appointments
+                .OrderBy(x => x.IsCancelled)
+                .ThenBy(x => x.StartsAt)
+                .ToList();
+
+            _appointments.Clear();
+            _appointments.AddRange(sortedAppointments);
+        }
+        catch (Exception ex)
+        {
+            _appointmentsError = ex.Message;
+        }
+        finally
+        {
+            _isLoadingAppointments = false;
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _isSubmitting = true;
+        _formError = null;
+        _formSuccess = null;
+
+        try
+        {
+            var result = await AppointmentsApiClient.CreateAsync(_model);
+            if (!result.IsSuccess)
+            {
+                _formError = result.ErrorMessage;
+                return;
+            }
+
+            _formSuccess = "Appointment created successfully.";
+            _highlightedAppointmentId = result.Appointment?.Id;
+            _selectedFilter = AppointmentFilter.All;
+
+            if (_highlightedAppointmentId.HasValue)
+            {
+                _ = ClearHighlightLaterAsync(_highlightedAppointmentId.Value);
+            }
+
+            _model = new CreateAppointmentInputModel
+            {
+                CustomerId = _selectedCustomerId,
+                StartsAt = string.Empty,
+                EndsAt = string.Empty
+            };
+
+            await LoadAppointmentsAsync();
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task ConfirmAndCancelAppointmentAsync(Guid appointmentId)
+    {
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Are you sure you want to cancel this appointment?");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await CancelAppointmentAsync(appointmentId);
+    }
+
+    private async Task CancelAppointmentAsync(Guid appointmentId)
+    {
+        _isCancelling = true;
+        _appointmentsError = null;
+        _appointmentsSuccessMessage = null;
+
+        try
+        {
+            var errorMessage = await AppointmentsApiClient.CancelAsync(appointmentId);
+            if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                _appointmentsError = errorMessage;
+                return;
+            }
+
+            _appointmentsSuccessMessage = "Appointment cancelled successfully.";
+            _editingAppointmentId = null;
+            _rescheduleError = null;
+            _highlightedAppointmentId = appointmentId;
+
+            _ = ClearHighlightLaterAsync(appointmentId);
+
+            await LoadAppointmentsAsync();
+        }
+        finally
+        {
+            _isCancelling = false;
+        }
+    }
+
+    private void BeginReschedule(Guid appointmentId)
+    {
+        var appointment = _appointments.FirstOrDefault(x => x.Id == appointmentId);
+        if (appointment is null)
+        {
+            return;
+        }
+
+        _editingAppointmentId = appointment.Id;
+        _rescheduleError = null;
+
+        _rescheduleModel = new RescheduleAppointmentInputModel
+        {
+            StartsAt = appointment.StartsAt.ToString("yyyy-MM-ddTHH:mm"),
+            EndsAt = appointment.EndsAt.ToString("yyyy-MM-ddTHH:mm")
+        };
+    }
+
+    private void CancelRescheduleEdit()
+    {
+        _editingAppointmentId = null;
+        _rescheduleError = null;
+        _rescheduleModel = new RescheduleAppointmentInputModel();
+    }
+
+    private async Task SaveRescheduleAsync()
+    {
+        if (!_editingAppointmentId.HasValue)
+        {
+            return;
+        }
+
+        _isRescheduling = true;
+        _rescheduleError = null;
+        _appointmentsError = null;
+        _appointmentsSuccessMessage = null;
+
+        try
+        {
+            var appointmentId = _editingAppointmentId.Value;
+
+            var errorMessage = await AppointmentsApiClient.RescheduleAsync(
+                appointmentId,
+                _rescheduleModel);
+
+            if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                _rescheduleError = errorMessage;
+                return;
+            }
+
+            await LoadAppointmentsAsync();
+
+            _appointmentsSuccessMessage = "Appointment rescheduled successfully.";
+            _highlightedAppointmentId = appointmentId;
+            _editingAppointmentId = null;
+            _rescheduleModel = new RescheduleAppointmentInputModel();
+            _selectedFilter = AppointmentFilter.All;
+
+            _ = ClearHighlightLaterAsync(appointmentId);
+        }
+        finally
+        {
+            _isRescheduling = false;
+        }
+    }
+
+    private async Task ClearHighlightLaterAsync(Guid appointmentId)
+    {
+        await Task.Delay(HighlightDuration);
+
+        if (_highlightedAppointmentId == appointmentId)
+        {
+            _highlightedAppointmentId = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private enum AppointmentFilter
+    {
+        All,
+        Active,
+        Cancelled
+    }
+}

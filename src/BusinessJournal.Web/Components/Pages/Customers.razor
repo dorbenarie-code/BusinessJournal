@@ -1,0 +1,326 @@
+@page "/customers"
+
+@using System.Linq
+@using BusinessJournal.Web.Features.Customers
+@inject CustomersApiClient CustomersApiClient
+@inject BusinessJournal.Web.Features.Auth.AuthSession AuthSession
+@inject NavigationManager NavigationManager
+
+<PageTitle>Customers</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <h1 class="display-6 mb-2">Customers</h1>
+        <p class="text-muted mb-0">Create customers and manage the customer list.</p>
+    </div>
+
+    @if (!AuthSession.IsAuthenticated)
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <h2 class="h4 mb-1">Login required</h2>
+                    <p class="text-muted mb-0">
+                        You need to sign in before viewing or creating customers.
+                    </p>
+                </div>
+
+                <div class="alert alert-secondary mb-4" role="alert">
+                    Your current session is not authenticated.
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/login")'>
+                        Go to login
+                    </button>
+
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            @onclick='() => NavigationManager.NavigateTo("/")'>
+                        Back to home
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    else if (_isLoadingCustomers)
+    {
+        <div class="alert alert-info mb-0" role="alert">
+            Loading customers...
+        </div>
+    }
+    else
+    {
+        <div class="row g-4 align-items-start">
+            <div class="col-12 col-xl-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <h2 class="h4 mb-1">Create customer</h2>
+                            <p class="text-muted mb-0">Add a new customer to the system.</p>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_formError))
+                        {
+                            <div class="alert alert-danger py-2 px-3 mb-3" role="alert">
+                                @_formError
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_formSuccess))
+                        {
+                            <div class="alert alert-success py-2 px-3 mb-3" role="alert">
+                                @_formSuccess
+                            </div>
+                        }
+
+                        <EditForm Model="_model" OnValidSubmit="HandleSubmitAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Full name</label>
+                                <InputText class="form-control"
+                                           placeholder="Enter full name"
+                                           @bind-Value="_model.FullName" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Phone number</label>
+                                <InputText class="form-control"
+                                           placeholder="Enter phone number"
+                                           @bind-Value="_model.PhoneNumber" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Email</label>
+                                <InputText class="form-control"
+                                           placeholder="Enter email address"
+                                           @bind-Value="_model.Email" />
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-primary px-4"
+                                        type="submit"
+                                        disabled="@_isSubmitting">
+                                    @(_isSubmitting ? "Creating..." : "Create customer")
+                                </button>
+
+                                <button class="btn btn-outline-secondary"
+                                        type="button"
+                                        disabled="@_isSubmitting"
+                                        @onclick="ClearForm">
+                                    Clear
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-7">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+                            <div>
+                                <h2 class="h4 mb-1">Customers list</h2>
+                                <p class="text-muted mb-0">Search and browse existing customers.</p>
+                            </div>
+
+                            <button class="btn btn-outline-secondary px-3"
+                                    type="button"
+                                    disabled="@_isLoadingCustomers"
+                                    @onclick="RefreshCustomersAsync">
+                                @(_isLoadingCustomers ? "Refreshing..." : "Refresh")
+                            </button>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_customersError))
+                        {
+                            <div class="alert alert-danger py-2 px-3 mb-3" role="alert">
+                                @_customersError
+                            </div>
+                        }
+
+                        <div class="mb-4">
+                            <input class="form-control"
+                                   placeholder="Search by name, phone, or email"
+                                   value="@_searchTerm"
+                                   @oninput="OnSearchChanged" />
+                        </div>
+
+                        @if (FilteredCustomers.Count == 0)
+                        {
+                            <div class="alert alert-light border py-3 px-3 mb-0" role="alert">
+                                @(string.IsNullOrWhiteSpace(_searchTerm)
+                                    ? "No customers found."
+                                    : "No customers match the current search.")
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="fw-semibold">Full name</th>
+                                            <th class="fw-semibold">Phone number</th>
+                                            <th class="fw-semibold">Email</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var customer in FilteredCustomers)
+                                        {
+                                            var isHighlighted = _highlightedCustomerId == customer.Id;
+
+                                            <tr class="@(isHighlighted ? "table-warning" : null)">
+                                                <td class="fw-semibold">@customer.FullName</td>
+                                                <td>@customer.PhoneNumber</td>
+                                                <td>@(string.IsNullOrWhiteSpace(customer.Email) ? "-" : customer.Email)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly TimeSpan HighlightDuration = TimeSpan.FromSeconds(4);
+
+    private readonly List<CustomerResponseModel> _customers = [];
+
+    private CreateCustomerInputModel _model = new();
+
+    private Guid? _highlightedCustomerId;
+
+    private bool _isLoadingCustomers = true;
+    private bool _isSubmitting;
+
+    private string? _formError;
+    private string? _formSuccess;
+    private string? _customersError;
+    private string _searchTerm = string.Empty;
+
+    private IReadOnlyList<CustomerResponseModel> FilteredCustomers =>
+        _customers
+            .Where(MatchesSearch)
+            .OrderBy(x => x.FullName)
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthSession.IsAuthenticated)
+        {
+            _isLoadingCustomers = false;
+            return;
+        }
+
+        await LoadCustomersAsync();
+    }
+
+    private async Task LoadCustomersAsync()
+    {
+        _isLoadingCustomers = true;
+        _customersError = null;
+
+        try
+        {
+            var customers = await CustomersApiClient.GetAllAsync();
+
+            _customers.Clear();
+            _customers.AddRange(customers.OrderBy(x => x.FullName));
+        }
+        catch (Exception ex)
+        {
+            _customersError = ex.Message;
+        }
+        finally
+        {
+            _isLoadingCustomers = false;
+        }
+    }
+
+    private async Task RefreshCustomersAsync()
+    {
+        await LoadCustomersAsync();
+    }
+
+    private void OnSearchChanged(ChangeEventArgs args)
+    {
+        _searchTerm = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _isSubmitting = true;
+        _formError = null;
+        _formSuccess = null;
+
+        try
+        {
+            var result = await CustomersApiClient.CreateAsync(_model);
+            if (!result.IsSuccess)
+            {
+                _formError = result.ErrorMessage;
+                return;
+            }
+
+            _formSuccess = "Customer created successfully.";
+            _highlightedCustomerId = result.Customer?.Id;
+
+            if (_highlightedCustomerId.HasValue)
+            {
+                _ = ClearHighlightLaterAsync(_highlightedCustomerId.Value);
+            }
+
+            _model = new CreateCustomerInputModel();
+
+            await LoadCustomersAsync();
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void ClearForm()
+    {
+        _model = new CreateCustomerInputModel();
+        _formError = null;
+        _formSuccess = null;
+    }
+
+    private bool MatchesSearch(CustomerResponseModel customer)
+    {
+        if (string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            return true;
+        }
+
+        var search = _searchTerm.Trim();
+
+        return customer.FullName.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || customer.PhoneNumber.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(customer.Email)
+                && customer.Email.Contains(search, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task ClearHighlightLaterAsync(Guid customerId)
+    {
+        await Task.Delay(HighlightDuration);
+
+        if (_highlightedCustomerId == customerId)
+        {
+            _highlightedCustomerId = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}
