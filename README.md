@@ -1,163 +1,157 @@
 # BusinessJournal
 
-BusinessJournal is an end-to-end system for managing customers and appointments, built with a strong focus on clean architecture, solid design principles, and real-world backend practices.
+> 91 tests passing | Clean Architecture | SQL Server | JWT Auth | Rate Limiting
+
+BusinessJournal is an end-to-end customer and appointment management system built with a strong backend focus.
+
+The project reflects real-world backend development practices: clean architecture, separation of concerns, SQL-based persistence, authentication, rate limiting, and automated tests.
 
 ---
 
 ## What this system does
 
-- Manage customers  
-- Schedule appointments  
-- Prevent overlapping time ranges  
-- Cancel and reschedule appointments  
-- Work with authenticated API endpoints (JWT)  
-
-The project also includes a Blazor frontend that consumes the API and demonstrates a complete flow.
+- Register and manage customers
+- Schedule appointments
+- Prevent overlapping appointments
+- Cancel and reschedule appointments
+- Protect endpoints with JWT authentication
+- Provide a Blazor frontend that consumes the API
 
 ---
 
 ## Tech Stack
 
-**Backend**
-- .NET 8 (ASP.NET Core Web API)
-- SQL Server (manual SQL + repository pattern)
+Backend:
+- .NET 8
+- ASP.NET Core Web API
+- SQL Server
 - JWT Authentication
 - Rate Limiting
 
-**Frontend**
-- Blazor (Server)
+Frontend:
+- Blazor Server
 - HttpClient API clients
 
-**Testing**
-- xUnit  
-- 90+ tests across all layers  
+Testing:
+- xUnit
+- 91 passing tests
 
 ---
 
 ## Architecture
 
-The project follows a clean layered structure:
+The solution is split into clear layers:
 
-- **Domain**  
-  Core entities and business rules (Customer, Appointment, TimeRange)
+- BusinessJournal.Domain  
+  Core entities and value objects (Customer, Appointment, AppUser, TimeRange)
 
-- **Application**  
-  Use cases and orchestration (CustomerService, AppointmentService, AuthService)
+- BusinessJournal.Application  
+  Services and use cases (CustomerService, AppointmentService, AuthService)
 
-- **Infrastructure**  
-  SQL access, repositories, connection factory
+- BusinessJournal.Infrastructure  
+  SQL access, repositories, connection factory, security (JWT, hashing)
 
-- **API**  
-  Controllers, authentication, rate limiting, request handling
+- BusinessJournal.Api  
+  Controllers, authentication, rate limiting, exception handling
 
-- **Web (Blazor)**  
-  Frontend consuming the API
+- BusinessJournal.Web  
+  Blazor frontend
 
-The focus was to keep responsibilities clear and avoid mixing concerns between layers.
-
----
-
-## SQL & Data Access
-
-- Uses **SQL Server** with explicit SQL scripts (`.sql` files)
-- No ORM abstraction layer (intentional decision)
-- Direct control over queries and schema
-- `SqlServerConnectionFactory` handles connection lifecycle cleanly
-- Repository pattern used in a pragmatic way (not over-engineered)
+- BusinessJournal.Tests  
+  Tests for all layers
 
 ---
 
-## Business Logic
+## SQL and Persistence
 
-Key rules implemented:
-
-- Appointments are validated using a **TimeRange value object**
-- Overlapping appointments are prevented at the application layer
-- Domain logic is not handled in controllers
+- SQL Server with explicit SQL scripts
+- Schema scripts under `database/`
+- SqlServerConnectionFactory manages connections
+- Repository pattern (pragmatic)
+- No ORM abstraction (intentional)
 
 ---
 
-## Authentication & Security
+## Authentication and Security
 
-- JWT-based authentication
-- Token generation handled by a dedicated service
-- Password hashing using ASP.NET Identity hasher
-- Protected endpoints require a valid token
-- Frontend automatically attaches the token via HTTP handler
+- JWT authentication
+- Dedicated auth service
+- Password hashing (ASP.NET Identity)
+- Protected endpoints
+- Token attached automatically in frontend
 
 ---
 
 ## Rate Limiting
 
-- Request rate limiting applied at the API level
-- Helps prevent abuse (e.g. login brute-force)
-- Policy-based configuration
-- Designed with real-world deployment in mind (proxy considerations)
+- API-level rate limiting
+- Prevents abuse (login brute-force)
+- Production-minded design
+
+---
+
+## Business Rules
+
+- TimeRange value object
+- Overlapping appointments rejected
+- Logic handled in application layer
+- Controllers stay thin
 
 ---
 
 ## Testing
 
-The project includes **91 passing tests** across multiple layers:
+91 passing tests across:
 
-- **Domain tests**  
-  Validate business rules (TimeRange, Appointment logic)
-
-- **Application tests**  
-  Validate services and workflows
-
-- **Infrastructure tests**  
-  Validate repository behavior
-
-- **API tests**  
-  Integration tests using WebApplicationFactory
-
-The goal was to ensure correctness without over-testing trivial code.
+- Domain
+- Application
+- Infrastructure
+- API
+- Web
 
 ---
 
 ## Running the project
 
-### Run API
-
-```bash
+Run API:
 cd src/BusinessJournal.Api
 dotnet run
-Run frontend
+
+Run frontend:
 cd src/BusinessJournal.Web
 dotnet run
-Example flow
-Login
-Create a customer
-Create an appointment
-Try to create an overlapping appointment (fails)
-Cancel or reschedule
-Design Goals
-Keep the code clean and readable
-Apply SOLID principles where they add real value
-Avoid over-engineering
-Build something that works end-to-end
-Focus on backend correctness, not just UI
 
+Run tests:
+dotnet test tests/BusinessJournal.Tests/BusinessJournal.Tests.csproj
 
-Author
-
-Built as part of my journey toward a backend developer role (C# / .NET).
-
-
-```md
-> 91 tests passing | Clean Architecture | SQL Server | JWT Auth | Rate Limiting
+---
 
 ## Screenshots
 
-### Home
+Home:
 ![Home](screenshots/home.png)
 
-### Login
+Login:
 ![Login](screenshots/login.png)
 
-### Customers
+Customers:
 ![Customers](screenshots/customers.png)
 
-### Appointments
+Appointments:
 ![Appointments](screenshots/appointments.png)
+
+---
+
+## Design Goals
+
+- Clean and readable code
+- SOLID where it matters
+- Clear separation of concerns
+- No over-engineering
+- End-to-end working system
+
+---
+
+## Author
+
+Built as part of my journey toward a backend developer role (C# / .NET).
