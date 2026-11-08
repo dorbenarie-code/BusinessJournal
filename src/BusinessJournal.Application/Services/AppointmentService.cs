@@ -1,4 +1,5 @@
 using BusinessJournal.Application.Common.Exceptions;
+using BusinessJournal.Application.Contracts.Appointments;
 using BusinessJournal.Application.Interfaces;
 using BusinessJournal.Domain.Entities;
 using BusinessJournal.Domain.ValueObjects;
@@ -7,6 +8,9 @@ namespace BusinessJournal.Application.Services;
 
 public sealed class AppointmentService
 {
+    private const string SlotNotAvailableMessage = "The requested time slot is not available.";
+    private const string AppointmentNotFoundMessage = "Appointment does not exist.";
+
     private readonly ICustomerRepository _customerRepository;
     private readonly IAppointmentRepository _appointmentRepository;
 
@@ -45,10 +49,11 @@ public sealed class AppointmentService
 
     public void CancelAppointment(Guid appointmentId)
     {
-        var appointment = GetRequiredAppointment(appointmentId);
-
-        appointment.Cancel();
-        _appointmentRepository.Update(appointment);
+        // Idempotent: cancelling an already cancelled appointment succeeds.
+        if (!_appointmentRepository.TryCancel(appointmentId))
+        {
+            throw new NotFoundException(AppointmentNotFoundMessage);
+        }
     }
 
     public void RescheduleAppointment(Guid appointmentId, DateTime startsAt, DateTime endsAt)
@@ -70,57 +75,37 @@ public sealed class AppointmentService
             throw new NotFoundException("Customer does not exist.");
         }
 
-        var overlappingAppointments = _appointmentRepository.GetOverlapping(
-            requestedTime.Start,
-            requestedTime.End);
-
-        if (overlappingAppointments.Any())
-        {
-            throw new ConflictException("The requested time slot is not available.");
-        }
-
         var appointment = Appointment.Create(
             customerId,
             title,
             requestedTime,
             notes);
 
-        _appointmentRepository.Add(appointment);
+        // The overlap check and the insert happen as one atomic step in the repository.
+        if (!_appointmentRepository.TryAdd(appointment))
+        {
+            throw new ConflictException(SlotNotAvailableMessage);
+        }
 
         return appointment;
     }
 
     private void RescheduleAppointment(Guid appointmentId, TimeRange newTime)
     {
-        var appointment = GetRequiredAppointment(appointmentId);
+        var result = _appointmentRepository.TryReschedule(appointmentId, newTime);
 
-        if (appointment.IsCancelled)
+        switch (result)
         {
-            throw new ConflictException("Cancelled appointments cannot be rescheduled.");
+            case RescheduleAppointmentResult.Rescheduled:
+                return;
+            case RescheduleAppointmentResult.NotFound:
+                throw new NotFoundException(AppointmentNotFoundMessage);
+            case RescheduleAppointmentResult.Cancelled:
+                throw new ConflictException("Cancelled appointments cannot be rescheduled.");
+            case RescheduleAppointmentResult.SlotTaken:
+                throw new ConflictException(SlotNotAvailableMessage);
+            default:
+                throw new InvalidOperationException($"Unknown reschedule result '{result}'.");
         }
-
-        var overlappingAppointments = _appointmentRepository.GetOverlapping(
-            newTime.Start,
-            newTime.End);
-
-        var hasConflict = overlappingAppointments.Any(existing => existing.Id != appointment.Id);
-        if (hasConflict)
-        {
-            throw new ConflictException("The requested time slot is not available.");
-        }
-
-        appointment.Reschedule(newTime);
-        _appointmentRepository.Update(appointment);
-    }
-
-    private Appointment GetRequiredAppointment(Guid appointmentId)
-    {
-        var appointment = _appointmentRepository.FindById(appointmentId);
-        if (appointment is null)
-        {
-            throw new NotFoundException("Appointment does not exist.");
-        }
-
-        return appointment;
     }
 }

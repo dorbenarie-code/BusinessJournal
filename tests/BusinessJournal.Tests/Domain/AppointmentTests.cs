@@ -133,6 +133,41 @@ public sealed class AppointmentTests
     }
 
     [Fact]
+    public void Reschedule_WhenAppointmentIsCancelled_ShouldThrowAndKeepOriginalTime()
+    {
+        var originalTime = TimeRange.Create(
+            new DateTime(2026, 4, 6, 10, 0, 0),
+            new DateTime(2026, 4, 6, 11, 0, 0));
+
+        var appointment = Appointment.Create(Guid.NewGuid(), "Hair Color", originalTime);
+        appointment.Cancel();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            appointment.Reschedule(
+                new DateTime(2026, 4, 6, 12, 0, 0),
+                new DateTime(2026, 4, 6, 13, 0, 0)));
+
+        Assert.True(appointment.IsCancelled);
+        Assert.Equal(originalTime, appointment.Time);
+    }
+
+    [Fact]
+    public void Cancel_WhenAlreadyCancelled_ShouldRemainCancelled()
+    {
+        var appointment = Appointment.Create(
+            Guid.NewGuid(),
+            "Hair Color",
+            TimeRange.Create(
+                new DateTime(2026, 4, 6, 10, 0, 0),
+                new DateTime(2026, 4, 6, 11, 0, 0)));
+
+        appointment.Cancel();
+        appointment.Cancel();
+
+        Assert.True(appointment.IsCancelled);
+    }
+
+    [Fact]
     public void Cancel_ShouldMarkAppointmentAsCancelled()
     {
         var appointment = Appointment.Create(

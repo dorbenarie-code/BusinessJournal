@@ -112,6 +112,12 @@ public sealed class Appointment
     {
         ArgumentNullException.ThrowIfNull(newTime);
 
+        // Cancellation is final: moving a cancelled appointment would bring it back into the calendar.
+        if (IsCancelled)
+        {
+            throw new InvalidOperationException("Cancelled appointments cannot be rescheduled.");
+        }
+
         Time = newTime;
     }
 

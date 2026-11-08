@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using BusinessJournal.Application.Contracts.Appointments;
 using BusinessJournal.Application.Interfaces;
 using BusinessJournal.Domain.Entities;
 using BusinessJournal.Domain.ValueObjects;
@@ -7,28 +8,75 @@ namespace BusinessJournal.Infrastructure.Repositories;
 
 public sealed class InMemoryAppointmentRepository : IAppointmentRepository
 {
+    // One lock for the whole calendar, like the SQL calendar lock: each change checks and
+    // writes as a single step.
+    private readonly object _calendarLock = new();
     private readonly ConcurrentDictionary<Guid, Appointment> _appointments = new();
 
-    public void Add(Appointment appointment)
+    public bool TryAdd(Appointment appointment)
     {
         ArgumentNullException.ThrowIfNull(appointment);
 
-        if (!_appointments.TryAdd(appointment.Id, appointment))
+        if (appointment.IsCancelled)
         {
-            throw new InvalidOperationException("An appointment with the same id already exists.");
+            throw new InvalidOperationException("Only active appointments can be added to the calendar.");
+        }
+
+        lock (_calendarLock)
+        {
+            if (_appointments.ContainsKey(appointment.Id))
+            {
+                throw new InvalidOperationException("An appointment with the same id already exists.");
+            }
+
+            if (HasActiveOverlap(appointment.Time, excludedAppointmentId: null))
+            {
+                return false;
+            }
+
+            _appointments[appointment.Id] = appointment;
+            return true;
         }
     }
 
-    public void Update(Appointment appointment)
+    public RescheduleAppointmentResult TryReschedule(Guid appointmentId, TimeRange newTime)
     {
-        ArgumentNullException.ThrowIfNull(appointment);
+        ArgumentNullException.ThrowIfNull(newTime);
 
-        if (!_appointments.ContainsKey(appointment.Id))
+        lock (_calendarLock)
         {
-            throw new InvalidOperationException("Appointment does not exist.");
-        }
+            if (!_appointments.TryGetValue(appointmentId, out var appointment))
+            {
+                return RescheduleAppointmentResult.NotFound;
+            }
 
-        _appointments[appointment.Id] = appointment;
+            if (appointment.IsCancelled)
+            {
+                return RescheduleAppointmentResult.Cancelled;
+            }
+
+            if (HasActiveOverlap(newTime, appointmentId))
+            {
+                return RescheduleAppointmentResult.SlotTaken;
+            }
+
+            appointment.Reschedule(newTime);
+            return RescheduleAppointmentResult.Rescheduled;
+        }
+    }
+
+    public bool TryCancel(Guid appointmentId)
+    {
+        lock (_calendarLock)
+        {
+            if (!_appointments.TryGetValue(appointmentId, out var appointment))
+            {
+                return false;
+            }
+
+            appointment.Cancel();
+            return true;
+        }
     }
 
     public Appointment? FindById(Guid appointmentId)
@@ -55,5 +103,13 @@ public sealed class InMemoryAppointmentRepository : IAppointmentRepository
             .Where(appointment => !appointment.IsCancelled)
             .Where(appointment => appointment.OverlapsWith(requestedTime))
             .ToList();
+    }
+
+    private bool HasActiveOverlap(TimeRange time, Guid? excludedAppointmentId)
+    {
+        return _appointments.Values.Any(appointment =>
+            appointment.Id != excludedAppointmentId
+            && !appointment.IsCancelled
+            && appointment.OverlapsWith(time));
     }
 }

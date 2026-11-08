@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using BusinessJournal.Web.Features.Auth;
 using BusinessJournal.Web.Features.Customers;
 using Xunit;
 
@@ -32,7 +33,7 @@ public sealed class CustomersApiClientTests
             BaseAddress = new Uri("http://localhost")
         };
 
-        var apiClient = new CustomersApiClient(client);
+        var apiClient = new CustomersApiClient(client, new AuthSession());
 
         var result = await apiClient.GetAllAsync();
 
@@ -49,7 +50,7 @@ public sealed class CustomersApiClientTests
             BaseAddress = new Uri("http://localhost")
         };
 
-        var apiClient = new CustomersApiClient(client);
+        var apiClient = new CustomersApiClient(client, new AuthSession());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             apiClient.GetAllAsync());
@@ -72,7 +73,7 @@ public sealed class CustomersApiClientTests
             BaseAddress = new Uri("http://localhost")
         };
 
-        var apiClient = new CustomersApiClient(client);
+        var apiClient = new CustomersApiClient(client, new AuthSession());
 
         var result = await apiClient.CreateAsync(new CreateCustomerInputModel
         {
@@ -94,7 +95,7 @@ public sealed class CustomersApiClientTests
             BaseAddress = new Uri("http://localhost")
         };
 
-        var apiClient = new CustomersApiClient(client);
+        var apiClient = new CustomersApiClient(client, new AuthSession());
 
         var result = await apiClient.CreateAsync(new CreateCustomerInputModel());
 

@@ -24,6 +24,7 @@ public sealed class AppointmentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<AppointmentResponse> Create(ScheduleAppointmentRequest request)
     {
         var appointment = _appointmentService.ScheduleAppointment(
@@ -70,6 +71,7 @@ public sealed class AppointmentsController : ControllerBase
     [HttpPost("{id:guid}/cancel")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public IActionResult Cancel(Guid id)
     {
         _appointmentService.CancelAppointment(id);
@@ -81,6 +83,7 @@ public sealed class AppointmentsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public IActionResult Reschedule(Guid id, RescheduleAppointmentRequest request)
     {
         _appointmentService.RescheduleAppointment(

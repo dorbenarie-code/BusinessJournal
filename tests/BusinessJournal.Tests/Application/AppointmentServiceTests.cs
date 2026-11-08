@@ -189,4 +189,109 @@ public sealed class AppointmentServiceTests
                 new DateTime(2026, 4, 8, 12, 30, 0),
                 new DateTime(2026, 4, 8, 13, 30, 0)));
     }
+
+    [Fact]
+    public void ScheduleAppointment_WhenAdjacentToExistingAppointment_ShouldSucceed()
+    {
+        var customerRepository = new InMemoryCustomerRepository();
+        var appointmentRepository = new InMemoryAppointmentRepository();
+        var customerService = new CustomerService(customerRepository);
+        var appointmentService = new AppointmentService(customerRepository, appointmentRepository);
+
+        var customer = customerService.RegisterCustomer("Rachel Cohen", "0501234567");
+
+        appointmentService.ScheduleAppointment(
+            customer.Id,
+            "Hair Color",
+            new DateTime(2026, 4, 8, 10, 0, 0),
+            new DateTime(2026, 4, 8, 11, 0, 0));
+
+        var adjacent = appointmentService.ScheduleAppointment(
+            customer.Id,
+            "Hair Cut",
+            new DateTime(2026, 4, 8, 11, 0, 0),
+            new DateTime(2026, 4, 8, 12, 0, 0));
+
+        Assert.NotNull(appointmentRepository.FindById(adjacent.Id));
+    }
+
+    [Fact]
+    public void ScheduleAppointment_WithInvalidTimeRange_ShouldThrowArgumentExceptionAndStoreNothing()
+    {
+        var customerRepository = new InMemoryCustomerRepository();
+        var appointmentRepository = new InMemoryAppointmentRepository();
+        var customerService = new CustomerService(customerRepository);
+        var appointmentService = new AppointmentService(customerRepository, appointmentRepository);
+
+        var customer = customerService.RegisterCustomer("Rachel Cohen", "0501234567");
+
+        Assert.Throws<ArgumentException>(() =>
+            appointmentService.ScheduleAppointment(
+                customer.Id,
+                "Hair Color",
+                new DateTime(2026, 4, 8, 11, 0, 0),
+                new DateTime(2026, 4, 8, 11, 0, 0)));
+
+        Assert.Empty(appointmentRepository.GetByCustomerId(customer.Id));
+    }
+
+    [Fact]
+    public void CancelAppointment_WhenCalledTwice_ShouldSucceedAndStayCancelled()
+    {
+        var customerRepository = new InMemoryCustomerRepository();
+        var appointmentRepository = new InMemoryAppointmentRepository();
+        var customerService = new CustomerService(customerRepository);
+        var appointmentService = new AppointmentService(customerRepository, appointmentRepository);
+
+        var customer = customerService.RegisterCustomer("Rachel Cohen", "0501234567");
+
+        var appointment = appointmentService.ScheduleAppointment(
+            customer.Id,
+            "Hair Color",
+            new DateTime(2026, 4, 8, 10, 0, 0),
+            new DateTime(2026, 4, 8, 11, 0, 0));
+
+        appointmentService.CancelAppointment(appointment.Id);
+        appointmentService.CancelAppointment(appointment.Id);
+
+        Assert.True(appointmentRepository.FindById(appointment.Id)!.IsCancelled);
+    }
+
+    [Fact]
+    public void RescheduleAppointment_WhenAppointmentDoesNotExist_ShouldThrowNotFoundException()
+    {
+        var customerRepository = new InMemoryCustomerRepository();
+        var appointmentRepository = new InMemoryAppointmentRepository();
+        var appointmentService = new AppointmentService(customerRepository, appointmentRepository);
+
+        Assert.Throws<NotFoundException>(() =>
+            appointmentService.RescheduleAppointment(
+                Guid.NewGuid(),
+                new DateTime(2026, 4, 8, 12, 0, 0),
+                new DateTime(2026, 4, 8, 13, 0, 0)));
+    }
+
+    [Fact]
+    public void RescheduleAppointment_WhenNewTimeOverlapsOnlyItsOwnCurrentTime_ShouldSucceed()
+    {
+        var customerRepository = new InMemoryCustomerRepository();
+        var appointmentRepository = new InMemoryAppointmentRepository();
+        var customerService = new CustomerService(customerRepository);
+        var appointmentService = new AppointmentService(customerRepository, appointmentRepository);
+
+        var customer = customerService.RegisterCustomer("Rachel Cohen", "0501234567");
+
+        var appointment = appointmentService.ScheduleAppointment(
+            customer.Id,
+            "Hair Color",
+            new DateTime(2026, 4, 8, 10, 0, 0),
+            new DateTime(2026, 4, 8, 11, 0, 0));
+
+        appointmentService.RescheduleAppointment(
+            appointment.Id,
+            new DateTime(2026, 4, 8, 10, 30, 0),
+            new DateTime(2026, 4, 8, 11, 30, 0));
+
+        Assert.Equal(new DateTime(2026, 4, 8, 10, 30, 0), appointmentRepository.FindById(appointment.Id)!.StartsAt);
+    }
 }

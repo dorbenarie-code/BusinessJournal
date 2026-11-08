@@ -1,16 +1,21 @@
 using System.Net;
 using System.Net.Http.Json;
+using BusinessJournal.Web.Features.Auth;
 
 namespace BusinessJournal.Web.Features.Appointments;
 
 public sealed class AppointmentsApiClient
 {
     private readonly HttpClient _httpClient;
+    private readonly AuthSession _authSession;
 
-    public AppointmentsApiClient(HttpClient httpClient)
+    public AppointmentsApiClient(HttpClient httpClient, AuthSession authSession)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(authSession);
+
         _httpClient = httpClient;
+        _authSession = authSession;
     }
 
     public async Task<IReadOnlyList<AppointmentResponseModel>> GetByCustomerIdAsync(
@@ -22,8 +27,13 @@ public sealed class AppointmentsApiClient
             return [];
         }
 
-        var response = await _httpClient.GetAsync(
-            $"/api/appointments/by-customer/{customerId}",
+        using var request = AuthorizedRequest.Create(
+            _authSession,
+            HttpMethod.Get,
+            $"/api/appointments/by-customer/{customerId}");
+
+        var response = await _httpClient.SendAsync(
+            request,
             cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -55,7 +65,7 @@ public sealed class AppointmentsApiClient
             return CreateAppointmentResult.Failure("Start time and end time are required.");
         }
 
-        var request = new
+        var payloadToSend = new
         {
             CustomerId = input.CustomerId,
             Title = input.Title,
@@ -64,8 +74,13 @@ public sealed class AppointmentsApiClient
             Notes = input.Notes
         };
 
-        var response = await _httpClient.PostAsJsonAsync(
+        using var request = AuthorizedRequest.Create(
+            _authSession,
+            HttpMethod.Post,
             "/api/appointments",
+            JsonContent.Create(payloadToSend));
+
+        var response = await _httpClient.SendAsync(
             request,
             cancellationToken);
 
@@ -116,9 +131,13 @@ public sealed class AppointmentsApiClient
             return "Appointment id is required.";
         }
 
-        var response = await _httpClient.PostAsync(
-            $"/api/appointments/{appointmentId}/cancel",
-            content: null,
+        using var request = AuthorizedRequest.Create(
+            _authSession,
+            HttpMethod.Post,
+            $"/api/appointments/{appointmentId}/cancel");
+
+        var response = await _httpClient.SendAsync(
+            request,
             cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -157,14 +176,19 @@ public sealed class AppointmentsApiClient
             return "Start time and end time are required.";
         }
 
-        var request = new
+        var payloadToSend = new
         {
             StartsAt = startsAt,
             EndsAt = endsAt
         };
 
-        var response = await _httpClient.PutAsJsonAsync(
+        using var request = AuthorizedRequest.Create(
+            _authSession,
+            HttpMethod.Put,
             $"/api/appointments/{appointmentId}/reschedule",
+            JsonContent.Create(payloadToSend));
+
+        var response = await _httpClient.SendAsync(
             request,
             cancellationToken);
 

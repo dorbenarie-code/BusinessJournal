@@ -105,21 +105,14 @@ static void ConfigureOptions(IServiceCollection services, IConfiguration configu
             "SqlServer:ConnectionString is required.")
         .ValidateOnStart();
 
+    // The rules live in JwtOptionsValidator so that startup and JwtTokenGenerator
+    // apply the same checks. The signing key is not part of appsettings.json; it
+    // must come from user-secrets or the Jwt__SigningKey environment variable.
+    services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();
+
     services
         .AddOptions<JwtOptions>()
         .Bind(configuration.GetSection("Jwt"))
-        .Validate(
-            options => !string.IsNullOrWhiteSpace(options.Issuer),
-            "Jwt:Issuer is required.")
-        .Validate(
-            options => !string.IsNullOrWhiteSpace(options.Audience),
-            "Jwt:Audience is required.")
-        .Validate(
-            options => !string.IsNullOrWhiteSpace(options.SigningKey),
-            "Jwt:SigningKey is required.")
-        .Validate(
-            options => options.ExpirationMinutes > 0,
-            "Jwt:ExpirationMinutes must be greater than zero.")
         .ValidateOnStart();
 }
 

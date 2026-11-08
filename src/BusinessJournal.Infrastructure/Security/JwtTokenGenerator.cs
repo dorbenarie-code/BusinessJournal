@@ -20,25 +20,9 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 
         _options = options.Value;
 
-        if (string.IsNullOrWhiteSpace(_options.Issuer))
-        {
-            throw new ArgumentException("Jwt:Issuer is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(_options.Audience))
-        {
-            throw new ArgumentException("Jwt:Audience is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(_options.SigningKey))
-        {
-            throw new ArgumentException("Jwt:SigningKey is required.");
-        }
-
-        if (_options.ExpirationMinutes <= 0)
-        {
-            throw new ArgumentException("Jwt:ExpirationMinutes must be greater than zero.");
-        }
+        // Same rules as API startup, so a missing, example or too short key
+        // cannot sign tokens even when the options pipeline is bypassed.
+        JwtOptionsValidator.EnsureValid(_options);
     }
 
     public AuthTokenResult Generate(AppUser user)
